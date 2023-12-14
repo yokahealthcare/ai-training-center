@@ -1,14 +1,13 @@
-import itertools
 import time
+from itertools import count
 from pprint import pprint
-from concurrent.futures import ProcessPoolExecutor
 
 import cv2
-import torch
 import mediapipe as mp
+import torch
 
 
-class PersonDetection():
+class PersonDetection:
     def __init__(self, yolo_model):
         self.model = yolo_model
         # We are only intrested in detecting person
@@ -35,7 +34,7 @@ class PersonDetection():
         pprint(self.result)
 
 
-class SinglePoseEstimation():
+class SinglePoseEstimation:
     def __init__(self):
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
@@ -67,6 +66,11 @@ class SinglePoseEstimation():
         except:
             return None
 
+    def set_frame_and_estimate(self, frame):
+        self.set_frame(frame)
+        self.estimate()
+        return self.get_annotated_frame()
+
     def get_annotated_frame(self):
         # Render detection
         self.mp_drawing.draw_landmarks(self.frame, self.result.pose_landmarks, self.mp_pose.POSE_CONNECTIONS,
@@ -75,17 +79,6 @@ class SinglePoseEstimation():
         return self.frame
 
 
-def process_frame(args):
-    pose_estimation_object, cropped_frame, result_queue = args
-
-    pose_estimation_object.set_frame(cropped_frame)
-    pose_estimation_object.estimate()
-
-    cropped_frame = single_pose.get_annotated_frame()
-    result_queue.put(cropped_frame)
-
-from multiprocessing import Pool, Manager
-
 if __name__ == "__main__":
     # Model
     yolo_model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
@@ -93,16 +86,11 @@ if __name__ == "__main__":
     person_detector = PersonDetection(yolo_model)
     single_pose = SinglePoseEstimation()
 
-    # Create a multiprocessing manager
-    manager = Manager()
-    # Create a shared queue for communication between processes
-    result_queue = manager.Queue()
-    # Create a multiprocessing pool
-    pool = Pool()
-
-    cap = cv2.VideoCapture("sample/rollin720.mp4")
+    cap = cv2.VideoCapture("dataset/video/person2.mkv")
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    while True:
+
+    # total_inference_time = 0
+    for i in count():
         ret, frame = cap.read()
         if not ret:
             break
@@ -115,32 +103,16 @@ if __name__ == "__main__":
         person_coordinate = person_detector.get_coordinate()
         number_of_person = len(person_coordinate)
 
-        args_list = []
         for person in person_coordinate:
             x1, y1, x2, y2, confidence, _ = person.to(int)
 
             cropped_frame = frame[y1:y2, x1:x2]
 
-            args_list.append((single_pose, cropped_frame, result_queue))
+            single_pose.set_frame(cropped_frame)
+            single_pose.estimate()
 
-        # Submit a task to the pool
-        result = pool.apply_async(process_frame, ())
-
-        result.wait()
-
-        # Check if the task is done
-        if result.ready():
-            # The task has completed
-            print("task completed")
-            for _ in range(number_of_person):
-                result_queue
-        else:
-            print("Task is still running.")
-
-        # Process the results in the main process
-        # for _ in range(number_of_person):
-        #     worker_callback(result_queue)
-        # frame[y1:y2, x1:x2] = cropped_frame
+            frm = single_pose.get_annotated_frame()
+            frame[y1:y2, x1:x2] = frm
 
         cv2.imshow("webcam", frame)
 
@@ -149,10 +121,14 @@ if __name__ == "__main__":
         print(f"\rInference time : {round(inference_time, 3)} second | {round((end - start) * 1000, 3)} ms", end='',
               flush=True)
 
+        # total_inference_time += inference_time
+        # if i % 100 == 0 and i != 0:
+        #     avg_inference_time = round(total_inference_time / 100, 3)
+        #     print(f"Average of Inference per 100 frame : {avg_inference_time} second | {avg_inference_time * 1000} ms")
+        #     total_inference_time = 0
+
         # Break the loop if 'q' key is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            pool.close()
-            pool.join()
             break
 
     # Release the capture object and close the window
