@@ -5,6 +5,7 @@ from pprint import pprint
 import cv2
 import mediapipe as mp
 import torch
+import torch.nn as nn
 
 
 class PersonDetection:
@@ -79,14 +80,49 @@ class SinglePoseEstimation:
         return self.frame
 
 
+# Define the neural network model
+class ThreeLayerClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size1, hidden_size2, output_size):
+        super(ThreeLayerClassifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size1)
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size1, hidden_size2)
+        self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(hidden_size2, output_size)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu1(x)
+        x = self.fc2(x)
+        x = self.relu2(x)
+        x = self.fc3(x)
+        x = self.sigmoid(x)
+        return x
+
+
 if __name__ == "__main__":
     # Model
+    # Initialize the model, loss function, and optimizer
+    input_size = 132
+    hidden_size1 = 50
+    hidden_size2 = 25
+    output_size = 1
+    # Create an instance of your model
+    model = ThreeLayerClassifier(input_size, hidden_size1, hidden_size2, output_size)
+    # Load the model's state_dict from a .pth file
+    model_path = 'training-area/erwin.pth'  # replace with the path to your .pth file
+    model.load_state_dict(torch.load(model_path))
+    # Set the model to evaluation mode
+    model.eval()
+
+    # Yolo Model
     yolo_model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
 
     person_detector = PersonDetection(yolo_model)
     single_pose = SinglePoseEstimation()
 
-    cap = cv2.VideoCapture("dataset/video/person2.mkv")
+    cap = cv2.VideoCapture("")
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # total_inference_time = 0
@@ -110,6 +146,17 @@ if __name__ == "__main__":
 
             single_pose.set_frame(cropped_frame)
             single_pose.estimate()
+
+            # machine learning
+            try:
+                input_data = torch.Tensor(
+                    [[res.x, res.y, res.z, res.visibility] for res in single_pose.result.pose_landmarks.landmark]).flatten()
+                predicted_output = model(input_data)
+                predicted_class = 1 if predicted_output.item() > 0.5 else 0
+
+                print(f'Predicted output: {predicted_output.item()}, Predicted class: {predicted_class}')
+            except Exception as e:
+                pass
 
             frm = single_pose.get_annotated_frame()
             frame[y1:y2, x1:x2] = frm

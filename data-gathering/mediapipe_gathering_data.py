@@ -81,7 +81,7 @@ class SinglePoseEstimation:
 if __name__ == "__main__":
     single_pose = SinglePoseEstimation()
 
-    cap = cv2.VideoCapture("../dataset/video/person2.mkv")
+    cap = cv2.VideoCapture("../dataset/video/v2_erwin.mkv")
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     target = 0
@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
         cv2.imshow("webcam", result)
 
-    df_data.to_csv("extracted/with_visibility/person2.csv", index=False)
+    df_data.to_csv("extracted/erwin.csv", index=False)
 
     # Release the capture object and close the window
     cap.release()
