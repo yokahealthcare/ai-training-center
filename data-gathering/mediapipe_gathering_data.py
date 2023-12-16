@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
         cv2.imshow("webcam", result)
 
-    df_data.to_csv("extracted/erwin.csv", index=False)
+    df_data.to_csv("mediapipe_extracted/erwin.csv", index=False)
 
     # Release the capture object and close the window
     cap.release()

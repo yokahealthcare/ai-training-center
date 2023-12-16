@@ -122,7 +122,7 @@ if __name__ == "__main__":
     person_detector = PersonDetection(yolo_model)
     single_pose = SinglePoseEstimation()
 
-    cap = cv2.VideoCapture("")
+    cap = cv2.VideoCapture("dataset/video/v2_erwin.mkv")
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # total_inference_time = 0
@@ -158,10 +158,10 @@ if __name__ == "__main__":
             except Exception as e:
                 pass
 
-            frm = single_pose.get_annotated_frame()
-            frame[y1:y2, x1:x2] = frm
+            # frm = single_pose.get_annotated_frame()
+            # frame[y1:y2, x1:x2] = frm
 
-        cv2.imshow("webcam", frame)
+        # cv2.imshow("webcam", frame)
 
         end = time.time()
         inference_time = end - start

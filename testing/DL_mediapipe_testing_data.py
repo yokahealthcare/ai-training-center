@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     single_pose = SinglePoseEstimation()
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("../dataset/video/v2_erwin.mkv")
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     while True:
@@ -147,7 +147,7 @@ if __name__ == "__main__":
               flush=True)
 
         frame = single_pose.get_annotated_frame()
-        cv2.imshow("webcam", frame)
+        # cv2.imshow("webcam", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
