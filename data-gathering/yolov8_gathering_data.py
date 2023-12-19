@@ -45,7 +45,7 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose.pt")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8m-pose_openvino_model/")
 
     # variable for gathering pure coordinate
     target = 0
@@ -80,16 +80,13 @@ if __name__ == "__main__":
 
     angel = pd.DataFrame(dt, index=range(1, 1))
 
-    for result in yolo.estimate("../dataset/video/v2_erwin.mkv"):
+    for result in yolo.estimate("../dataset/lapas ngaseman/CCTV FIGHT MASJID/FIGHT_195_230.mp4"):
         # Wait for a key event and get the ASCII code
         key = cv2.waitKey(1) & 0xFF
 
-        if key == ord('p'):
+        if key == ord('f'):
             target = 1
-            print("punch key pressed!")
-        elif key == ord('k'):
-            target = 2
-            print("kick key pressed!")
+            print("fight key pressed!")
         elif key == ord('s'):
             target = 0
             print("stop key pressed!")
@@ -101,36 +98,40 @@ if __name__ == "__main__":
             two = [target]  # this for angel
 
             # get the data
-            xyn = result.keypoints.xyn[0].tolist()
-            confs = result.keypoints.conf[0].tolist()
+            xyn = result.keypoints.xyn
+            confs = result.keypoints.conf
 
-            # this gathering pure coordinate data
-            for idx, keypoint in enumerate(xyn):
-                x = keypoint[0]  # this is x coordinate
-                one.append(x)
-                y = keypoint[1]  # this is y coordinate
-                one.append(y)
-                conf = confs[idx]
-                one.append(conf)
+            print(f"xyn : {xyn}")
+            print(f"conf : {confs}")
 
-            pure.loc[-1] = one  # adding a row
-            pure.index = pure.index + 1  # shifting index
-            pure = pure.sort_index()  # sorting by index
 
-            # this is gathering angel data
-            for n in need:
-                # index
-                first = n[0]
-                mid = n[1]
-                end = n[2]
-
-                # get data using the index before
-                # getting angel from three coordinate
-                two.append(calculate_angle(xyn[first], xyn[mid], xyn[end]))
-
-            angel.loc[-1] = two  # adding a row
-            angel.index = angel.index + 1  # shifting index
-            angel = angel.sort_index()  # sorting by index
+            # # this gathering pure coordinate data
+            # for idx, keypoint in enumerate(xyn):
+            #     x = keypoint[0]  # this is x coordinate
+            #     one.append(x)
+            #     y = keypoint[1]  # this is y coordinate
+            #     one.append(y)
+            #     conf = confs[idx]
+            #     one.append(conf)
+            #
+            # pure.loc[-1] = one  # adding a row
+            # pure.index = pure.index + 1  # shifting index
+            # pure = pure.sort_index()  # sorting by index
+            #
+            # # this is gathering angel data
+            # for n in need:
+            #     # index
+            #     first = n[0]
+            #     mid = n[1]
+            #     end = n[2]
+            #
+            #     # get data using the index before
+            #     # getting angel from three coordinate
+            #     two.append(calculate_angle(xyn[first], xyn[mid], xyn[end]))
+            #
+            # angel.loc[-1] = two  # adding a row
+            # angel.index = angel.index + 1  # shifting index
+            # angel = angel.sort_index()  # sorting by index
 
         except TypeError as te:
             pass
@@ -139,7 +140,7 @@ if __name__ == "__main__":
 
         cv2.imshow("webcam", result)
 
-    # save the pure coordinate
-    pure.to_csv("yolov8_extracted/erwin.csv", index=False)
-    # save the angel
-    angel.to_csv("yolov8_extracted/erwin-angel.csv", index=False)
+    # # save the pure coordinate
+    # pure.to_csv("yolov8_extracted/erwin.csv", index=False)
+    # # save the angel
+    # angel.to_csv("yolov8_extracted/erwin-angel.csv", index=False)
