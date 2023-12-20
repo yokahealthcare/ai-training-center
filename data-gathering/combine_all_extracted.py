@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 
-folder_path = 'yolov8_extracted'
+folder_path = 'yolov8_extracted_angel'
 
 # Get a list of all files in the folder
 files = os.listdir(folder_path)
@@ -19,6 +19,9 @@ for csv_file in csv_files:
     file_path = os.path.join(folder_path, csv_file)
     df = pd.read_csv(file_path)
     combined_data = pd.concat([combined_data, df], ignore_index=True)
+
+# drop any zero on values
+combined_data = combined_data[combined_data.drop('class', axis=1).ne(0).all(axis=1)]
 
 # Get the current date
 current_date = datetime.now().strftime("%d%m%Y")

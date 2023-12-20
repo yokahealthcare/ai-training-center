@@ -40,9 +40,10 @@ def calculate_angle(a, b, c):
 
     return angle
 
+
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("yolo_model/yolov8n-pose.pt")
-    loaded_model = joblib.load("training-area/MODEL/angel/logistic_regression.pkl")
+    yolo = YoloPoseEstimation("yolo_model/yolov8n-pose_openvino_model")
+    loaded_model = joblib.load("training-area/MODEL/angel/lapas_ngaseman_logistic_regression.pkl")
 
     # variable for gathering angel
     # index keypoints number
@@ -57,7 +58,8 @@ if __name__ == "__main__":
         [11, 13, 15]
     ]
 
-    for result in yolo.estimate("dataset/video/v2_erwin.mkv"):
+    THRESHOLD = 0.7
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_910_965.mp4"):
         # Wait for a key event and get the ASCII code
         key = cv2.waitKey(1) & 0xFF
 
@@ -66,25 +68,31 @@ if __name__ == "__main__":
 
         try:
             # get the data
-            xyn = result.keypoints.xyn[0].tolist()
-            confs = result.keypoints.conf[0].tolist()
+            xyn = result.keypoints.xyn.tolist()
 
             # this is gathering angel data
-            temp = []
-            for n in need:
-                # index
-                first = n[0]
-                mid = n[1]
-                end = n[2]
 
-                # get data using the index before
-                # getting angel from three coordinate
-                temp.append(calculate_angle(xyn[first], xyn[mid], xyn[end]))
+            temp_pred = []
+            # Using a for loop with zip
+            for xyn_row in xyn:
+                temp = []
+                for n in need:
+                    # index
+                    first = n[0]
+                    mid = n[1]
+                    end = n[2]
 
-            # do prediction
-            pred = loaded_model.predict(np.array(temp).reshape(1, -1))
-            print(f"Prediction : {pred}")
+                    # get data using the index before
+                    # getting angel from three coordinate
+                    temp.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
 
+                # do prediction
+                pred = loaded_model.predict_proba(np.array(temp).reshape(1, -1))
+                if pred[0][1] > THRESHOLD:
+                    temp_pred.append(1)
+                else:
+                    temp_pred.append(0)
+            print(f"Prediction : {temp_pred}")
         except TypeError as te:
             pass
 

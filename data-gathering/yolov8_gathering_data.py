@@ -45,10 +45,11 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8m-pose_openvino_model/")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose_openvino_model/")
+    FILENAME = "NO_FIGHT_1190_1275"
 
     # variable for gathering pure coordinate
-    target = 0
+    target = -1
     dt = {
         "class": target
     }
@@ -80,7 +81,7 @@ if __name__ == "__main__":
 
     angel = pd.DataFrame(dt, index=range(1, 1))
 
-    for result in yolo.estimate("../dataset/lapas ngaseman/CCTV FIGHT MASJID/FIGHT_195_230.mp4"):
+    for result in yolo.estimate(f"../dataset/lapas ngaseman/CCTV FIGHT/{FILENAME}.mp4"):
         # Wait for a key event and get the ASCII code
         key = cv2.waitKey(1) & 0xFF
 
@@ -89,58 +90,81 @@ if __name__ == "__main__":
             print("fight key pressed!")
         elif key == ord('s'):
             target = 0
-            print("stop key pressed!")
+            print("no fight key pressed!")
+        elif key == ord('p'):
+            target = -1
+            print("pause key pressed!")
         elif key == ord('q'):
             break
 
         try:
-            one = [target]  # this for pure coordinate
-            two = [target]  # this for angel
+            # check if the pause key not pressed
+            # pause mean not gathering any data
+            if target != -1:
+                # get the data
+                xyn = result.keypoints.xyn.tolist()
+                confs = result.keypoints.conf
 
-            # get the data
-            xyn = result.keypoints.xyn
-            confs = result.keypoints.conf
+                if confs is None:
+                    confs = []
+                else:
+                    confs = confs.tolist()
 
-            print(f"xyn : {xyn}")
-            print(f"conf : {confs}")
+                # Using a for loop with zip
+                for conf_row, xyn_row in zip(confs, xyn):
+                    one = [target]  # this for pure coordinate
+                    two = [target]  # this for angel
+                    # this gathering pure coordinate data
+                    for idx, keypoint in enumerate(xyn_row):
+                        x = keypoint[0]  # this is x coordinate
+                        one.append(x)
+                        y = keypoint[1]  # this is y coordinate
+                        one.append(y)
+                        conf = conf_row[idx]
+                        one.append(conf)
 
+                    pure.loc[-1] = one  # adding a row
+                    pure.index = pure.index + 1  # shifting index
+                    pure = pure.sort_index()  # sorting by index
 
-            # # this gathering pure coordinate data
-            # for idx, keypoint in enumerate(xyn):
-            #     x = keypoint[0]  # this is x coordinate
-            #     one.append(x)
-            #     y = keypoint[1]  # this is y coordinate
-            #     one.append(y)
-            #     conf = confs[idx]
-            #     one.append(conf)
-            #
-            # pure.loc[-1] = one  # adding a row
-            # pure.index = pure.index + 1  # shifting index
-            # pure = pure.sort_index()  # sorting by index
-            #
-            # # this is gathering angel data
-            # for n in need:
-            #     # index
-            #     first = n[0]
-            #     mid = n[1]
-            #     end = n[2]
-            #
-            #     # get data using the index before
-            #     # getting angel from three coordinate
-            #     two.append(calculate_angle(xyn[first], xyn[mid], xyn[end]))
-            #
-            # angel.loc[-1] = two  # adding a row
-            # angel.index = angel.index + 1  # shifting index
-            # angel = angel.sort_index()  # sorting by index
+                    # this is gathering angel data
+                    for n in need:
+                        # index
+                        first = n[0]
+                        mid = n[1]
+                        end = n[2]
+
+                        # get data using the index before
+                        # getting angel from three coordinate
+                        two.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
+
+                    angel.loc[-1] = two  # adding a row
+                    angel.index = angel.index + 1  # shifting index
+                    angel = angel.sort_index()  # sorting by index
 
         except TypeError as te:
             pass
 
-        result = result.plot()
+        frame = result.plot()
 
-        cv2.imshow("webcam", result)
+        # annotate the frame with text - for easier data capturing
+        # Choose the font type and scale
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.0
 
-    # # save the pure coordinate
-    # pure.to_csv("yolov8_extracted/erwin.csv", index=False)
-    # # save the angel
-    # angel.to_csv("yolov8_extracted/erwin-angel.csv", index=False)
+        # Choose the font color and thickness
+        font_color = (255, 255, 255)  # White color in BGR
+        font_thickness = 2
+
+        # Choose the position to put the text
+        text_position = (25, 25)
+        # Add text to the image
+        cv2.putText(frame, f"TARGET: {target}", text_position, font, font_scale, font_color, font_thickness)
+
+        cv2.imshow("webcam", frame)
+
+    filename = f"lapas_ngaseman_{FILENAME}.csv"
+    # save the pure coordinate
+    pure.to_csv(f"yolov8_extracted/{filename}", index=False)
+    # save the angel
+    angel.to_csv(f"yolov8_extracted_angel/{filename}", index=False)
