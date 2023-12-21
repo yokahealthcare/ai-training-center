@@ -59,7 +59,7 @@ if __name__ == "__main__":
     ]
 
     THRESHOLD = 0.7
-    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_910_965.mp4"):
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/FIGHT_595_640.mp4"):
         # Wait for a key event and get the ASCII code
         key = cv2.waitKey(1) & 0xFF
 
@@ -77,14 +77,17 @@ if __name__ == "__main__":
             for xyn_row in xyn:
                 temp = []
                 for n in need:
-                    # index
-                    first = n[0]
-                    mid = n[1]
-                    end = n[2]
+                    try:
+                        # index
+                        first = n[0]
+                        mid = n[1]
+                        end = n[2]
 
-                    # get data using the index before
-                    # getting angel from three coordinate
-                    temp.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
+                        # get data using the index before
+                        # getting angel from three coordinate
+                        temp.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
+                    except:
+                        temp.append(0)
 
                 # do prediction
                 pred = loaded_model.predict_proba(np.array(temp).reshape(1, -1))

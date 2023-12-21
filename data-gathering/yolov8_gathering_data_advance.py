@@ -1,3 +1,5 @@
+import os
+import sys
 import time
 
 import cv2
@@ -13,7 +15,7 @@ class YoloPoseEstimation:
         self.result = None
 
     def estimate(self, input):
-        self.result = self.model(input, stream=True)
+        self.result = self.model(input)
         return self.result
 
     def info(self):
@@ -46,12 +48,16 @@ def calculate_angle(a, b, c):
 
 if __name__ == "__main__":
     yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose_openvino_model/")
-    FILENAME = "FIGHT_190_230"
 
-    # variable for gathering pure coordinate
-    target = -1
+    # Path to the directory that stored all frame of the video
+    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT MASJID/FIGHT_195_230"
+    FILENAME = directory_path.split("/")[-1]
+    # Open the text file for reading
+    file_path = f'{directory_path}/annotation_time'
+
+    # Variable for gathering pure coordinate
     dt = {
-        "class": target
+        "class": 0
     }
     for i in range(1, 18):
         dt[f"x{i}"] = 0
@@ -61,7 +67,7 @@ if __name__ == "__main__":
     pure = pd.DataFrame(dt, index=range(1, 1))
 
     # variable for gathering angel
-    # index keypoints number
+    # index key points number
     need = [
         [8, 6, 2],
         [11, 5, 7],
@@ -72,48 +78,71 @@ if __name__ == "__main__":
         [12, 14, 16],
         [11, 13, 15]
     ]
-
     dt = {
-        "class": target
+        "class": 0
     }
     for i in range(1, 9):
         dt[f"a{i}"] = 0
+        dt[f"v{i}"] = 0
 
     angel = pd.DataFrame(dt, index=range(1, 1))
 
-    for result in yolo.estimate(f"../dataset/lapas ngaseman/CCTV FIGHT/{FILENAME}.mp4"):
-        # Wait for a key event and get the ASCII code
-        key = cv2.waitKey(1) & 0xFF
+    with open(file_path, 'r') as file:
+        # Loop through each line in the file
+        for line in file:
+            # Split the values using commas
+            values = line.strip().split(',')
 
-        if key == ord('f'):
-            target = 1
-            print("fight key pressed!")
-        elif key == ord('s'):
-            target = 0
-            print("no fight key pressed!")
-        elif key == ord('p'):
-            target = -1
-            print("pause key pressed!")
-        elif key == ord('q'):
-            break
+            # Convert the values to integers or other data types as needed
+            class_label = int(values[0])
+            start_value = int(values[1])
+            end_value = int(values[2])
 
-        try:
-            # check if the pause key not pressed
-            # pause mean not gathering any data
-            if target != -1:
-                # get the data
-                xyn = result.keypoints.xyn.tolist()
-                confs = result.keypoints.conf
+            # Your processing code for each row goes here
+            print("Starting new annotation process for...")
+            print(f"Class: {class_label}, Start Frame: {start_value}, End Frame: {end_value}")
 
-                if confs is None:
-                    confs = []
+            target = None
+            for num in range(start_value, end_value + 1):
+                # Annotation process for each frame
+                frame_path = f"{directory_path}/frame{str(num).zfill(4)}.jpg"
+                result = yolo.estimate(frame_path)
+                cv2.imshow("Webcam", result[0].plot())
+
+                # Waiting for user to decide which one KEYPOINTS to write
+                if target != 3:
+                    key = cv2.waitKey(0) & 0xFF  # Wait indefinitely for a key press
+                    if key == ord('a'):
+                        print("LEFT skeletal keypoints saved")
+                        target = 0
+                    elif key == ord('d'):
+                        print("RIGHT skeletal keypoints saved")
+                        target = 1
+                    elif key == ord('b'):
+                        print("BOTH skeletal keypoints saved")
+                        target = 2
+                    elif key == ord('v'):
+                        print("FAST ANNOTATE skeletal keypoints saved")
+                        target = 3
+                    elif key == ord('s'):
+                        print("SKIPPED!")
+                        continue
+                    elif key == ord('q'):
+                        print("Exited! Next Row of Annotation Time")
+                        break
+
+                # Writing key points process
+                if target != 2 and target != 3:
+                    xyn = [result[0].keypoints.xyn.tolist()[target]]
+                    confs = [result[0].keypoints.conf.tolist()[target]]
                 else:
-                    confs = confs.tolist()
+                    xyn = result[0].keypoints.xyn.tolist()
+                    confs = result[0].keypoints.conf.tolist()
 
                 # Using a for loop with zip
                 for conf_row, xyn_row in zip(confs, xyn):
-                    one = [target]  # this for pure coordinate
-                    two = [target]  # this for angel
+                    one = [class_label]  # this for pure coordinate
+                    two = [class_label]  # this for angel
                     # this gathering pure coordinate data
                     for idx, keypoint in enumerate(xyn_row):
                         x = keypoint[0]  # this is x coordinate
@@ -137,34 +166,15 @@ if __name__ == "__main__":
                         # get data using the index before
                         # getting angel from three coordinate
                         two.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
+                        two.append(torch.mean(torch.Tensor([conf_row[first], conf_row[mid], conf_row[end]])).item())
 
                     angel.loc[-1] = two  # adding a row
                     angel.index = angel.index + 1  # shifting index
                     angel = angel.sort_index()  # sorting by index
 
-        except TypeError as te:
-            pass
-
-        frame = result.plot()
-
-        # annotate the frame with text - for easier data capturing
-        # Choose the font type and scale
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1.0
-
-        # Choose the font color and thickness
-        font_color = (255, 255, 255)  # White color in BGR
-        font_thickness = 2
-
-        # Choose the position to put the text
-        text_position = (25, 25)
-        # Add text to the image
-        cv2.putText(frame, f"TARGET: {target}", text_position, font, font_scale, font_color, font_thickness)
-
-        cv2.imshow("webcam", frame)
-
     filename = f"lapas_ngaseman_{FILENAME}.csv"
     # save the pure coordinate
-    pure.to_csv(f"{filename}", index=False)
+    pure.to_csv(f"yolov8_extracted_advance/{filename}", index=False)
     # save the angel
-    angel.to_csv(f"{filename}", index=False)
+    angel.to_csv(f"yolov8_extracted_angel_advance/{filename}", index=False)
+    cv2.destroyAllWindows()
