@@ -47,10 +47,10 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose_openvino_model/")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8l-pose.engine")
 
     # Path to the directory that stored all frame of the video
-    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT MASJID/FIGHT_195_230"
+    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_1190_1275"
     FILENAME = directory_path.split("/")[-1]
     # Open the text file for reading
     file_path = f'{directory_path}/annotation_time'
