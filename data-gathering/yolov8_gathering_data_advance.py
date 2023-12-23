@@ -47,10 +47,10 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8l-pose.engine")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8x-pose.engine")
 
     # Path to the directory that stored all frame of the video
-    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_1190_1275"
+    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT/FIGHT_595_640"
     FILENAME = directory_path.split("/")[-1]
     # Open the text file for reading
     file_path = f'{directory_path}/annotation_time'
@@ -131,46 +131,49 @@ if __name__ == "__main__":
                         print("Exited! Next Row of Annotation Time")
                         break
 
-                # Writing key points process
-                if target != 2 and target != 3:
-                    xyn = [result[0].keypoints.xyn.tolist()[target]]
-                    confs = [result[0].keypoints.conf.tolist()[target]]
-                else:
-                    xyn = result[0].keypoints.xyn.tolist()
-                    confs = result[0].keypoints.conf.tolist()
+                try:
+                    # Writing key points process
+                    if target != 2 and target != 3:
+                        xyn = [result[0].keypoints.xyn.tolist()[target]]
+                        confs = [result[0].keypoints.conf.tolist()[target]]
+                    else:
+                        xyn = result[0].keypoints.xyn.tolist()
+                        confs = result[0].keypoints.conf.tolist()
 
-                # Using a for loop with zip
-                for conf_row, xyn_row in zip(confs, xyn):
-                    one = [class_label]  # this for pure coordinate
-                    two = [class_label]  # this for angel
-                    # this gathering pure coordinate data
-                    for idx, keypoint in enumerate(xyn_row):
-                        x = keypoint[0]  # this is x coordinate
-                        one.append(x)
-                        y = keypoint[1]  # this is y coordinate
-                        one.append(y)
-                        conf = conf_row[idx]
-                        one.append(conf)
+                    # Using a for loop with zip
+                    for conf_row, xyn_row in zip(confs, xyn):
+                        one = [class_label]  # this for pure coordinate
+                        two = [class_label]  # this for angel
+                        # this gathering pure coordinate data
+                        for idx, keypoint in enumerate(xyn_row):
+                            x = keypoint[0]  # this is x coordinate
+                            one.append(x)
+                            y = keypoint[1]  # this is y coordinate
+                            one.append(y)
+                            conf = conf_row[idx]
+                            one.append(conf)
 
-                    pure.loc[-1] = one  # adding a row
-                    pure.index = pure.index + 1  # shifting index
-                    pure = pure.sort_index()  # sorting by index
+                        pure.loc[-1] = one  # adding a row
+                        pure.index = pure.index + 1  # shifting index
+                        pure = pure.sort_index()  # sorting by index
 
-                    # this is gathering angel data
-                    for n in need:
-                        # index
-                        first = n[0]
-                        mid = n[1]
-                        end = n[2]
+                        # this is gathering angel data
+                        for n in need:
+                            # index
+                            first = n[0]
+                            mid = n[1]
+                            end = n[2]
 
-                        # get data using the index before
-                        # getting angel from three coordinate
-                        two.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
-                        two.append(torch.mean(torch.Tensor([conf_row[first], conf_row[mid], conf_row[end]])).item())
+                            # get data using the index before
+                            # getting angel from three coordinate
+                            two.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
+                            two.append(torch.mean(torch.Tensor([conf_row[first], conf_row[mid], conf_row[end]])).item())
 
-                    angel.loc[-1] = two  # adding a row
-                    angel.index = angel.index + 1  # shifting index
-                    angel = angel.sort_index()  # sorting by index
+                        angel.loc[-1] = two  # adding a row
+                        angel.index = angel.index + 1  # shifting index
+                        angel = angel.sort_index()  # sorting by index
+                except:
+                    pass
 
     filename = f"lapas_ngaseman_{FILENAME}.csv"
     # save the pure coordinate
