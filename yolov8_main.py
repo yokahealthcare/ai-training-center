@@ -11,7 +11,7 @@ class YoloPoseEstimation:
         self.result = None
 
     def estimate(self, input):
-        self.result = self.model(input, stream=True, persist=True)
+        self.result = self.model(input, stream=True)
         return self.result
 
     def info(self):
@@ -90,16 +90,16 @@ class FightDetection:
 
         # Set up the thresholds
         self.threshold = 0.8  # Dictate how deep learning is sure there is fight on that frame
-        self.conclusion_threshold = 3  # Dictate how hard the program conclude if there is fight in the scene (1 - 3)
+        self.conclusion_threshold = 2  # Dictate how hard the program conclude if there is fight in the scene (1 - 3)
         self.FPS = fps
 
         # Event variables
+        self.fight_detected = 0
         self.is_fight_occur = False
 
     def detect(self, conf, xyn):
         input_list = []
         keypoint_unseen = False
-        fight_detected = 0
         for n in self.coordinate_for_angel:
             # Keypoint number that we want to make new angel
             first, mid, end = n[0], n[1], n[2]
@@ -126,19 +126,21 @@ class FightDetection:
             # FIGHT
             # this will grow exponentially according to number of person fighting on scene
             # if there is two person, and this will be added 2 for each frame
-            fight_detected += 1
+            self.fight_detected += 1
         else:
             # NO FIGHT
             # this if statement is for fight_detected not exceed negative value
-            if fight_detected > 0:
-                fight_detected -= 3
+            if self.fight_detected > 0:
+                self.fight_detected -= self.conclusion_threshold
                 # this value will decide how hard the program will conclude there is a fight in the frame
                 # the higher the value, the more hard program to conclude
 
         # Threshold for fight_detected value, when it concludes there is fight on the frame
         # THRESHOLD = FPS * NUMBER OF PERSON DETECTED
-        if fight_detected > self.FPS * len(conf):
+        if self.fight_detected > self.FPS:
             self.is_fight_occur = True
+        elif self.fight_detected <= 0:
+            self.is_fight_occur = False
 
     def annotate(self, frame, box):
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -157,13 +159,47 @@ class FightDetection:
         return frame
 
 
+def calculate_iou(box1, box2):
+    # Calculate intersection coordinates
+    x1_inter = max(box1[0], box2[0])
+    y1_inter = max(box1[1], box2[1])
+    x2_inter = min(box1[2], box2[2])
+    y2_inter = min(box1[3], box2[3])
+
+    # Calculate area of intersection
+    area_inter = max(0, x2_inter - x1_inter + 1) * max(0, y2_inter - y1_inter + 1)
+
+    # Calculate area of individual bounding boxes
+    area_box1 = (box1[2] - box1[0] + 1) * (box1[3] - box1[1] + 1)
+    area_box2 = (box2[2] - box2[0] + 1) * (box2[3] - box2[1] + 1)
+
+    # Calculate union area
+    area_union = area_box1 + area_box2 - area_inter
+
+    # Calculate IoU
+    iou = area_inter / area_union if area_union > 0 else 0.0
+    return iou
+
+
+def calculate_all_ious(bounding_boxes):
+    num_boxes = len(bounding_boxes)
+    ious = []
+
+    for i in range(num_boxes):
+        for j in range(i + 1, num_boxes):
+            iou = calculate_iou(bounding_boxes[i], bounding_boxes[j])
+            ious.append(iou)
+
+    return ious
+
+
 YOLO_MODEL = "yolo_model/yolov8n-pose_openvino_model"
 FIGHT_MODEL = "training-area/MODEL/angel/lapas_ngaseman.pth"
 FPS = 20
 if __name__ == "__main__":
     fdet = FightDetection(FIGHT_MODEL, FPS)
     yolo = YoloPoseEstimation(YOLO_MODEL)
-    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_775_825.mp4"):
+    for result in yolo.estimate("dataset/video/CCTV_florida.mp4"):
         # Wait for a key event and get the ASCII code
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -180,13 +216,36 @@ if __name__ == "__main__":
             else:
                 confs = confs.tolist()
 
-            # Prediction start here
+            # Processing interaction box
+            interaction_boxes = []
+            ious = calculate_all_ious(boxes)
+            print("IoU between bounding boxes:")
+            for i, iou in enumerate(ious):
+                print(f"Box {i + 1} and Box {i + 2}: {iou:.4f}")
+                if iou > 0.1:
+                    try:
+                        interaction = [
+                            min(boxes[i][0], boxes[i + 1][0]),  # x1
+                            min(boxes[i][1], boxes[i + 1][1]),  # y1
+                            max(boxes[i][2], boxes[i + 1][2]),  # x2
+                            max(boxes[i][3], boxes[i + 1][3])  # y2
+                        ]
+                        interaction_boxes.append(interaction)
+                    except IndexError:
+                        pass
+
+            # Prediction start here - per person
             for conf, xyn, box in zip(confs, xyn, boxes):
-                # Fight Detection
-                fdet.detect(conf, xyn)
+                # if len(interaction_boxes) != 0:
+                #     # Fight Detection
+                #     fdet.detect(conf, xyn)
 
                 # Plot
                 result_frame = fdet.annotate(result_frame, box)
+
+            # Interaction Box
+            for box in interaction_boxes:
+                cv2.rectangle(result_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
 
             cv2.imshow("webcam", result_frame)
         except TypeError as te:
