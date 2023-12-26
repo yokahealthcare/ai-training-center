@@ -1,13 +1,8 @@
 import cv2
 import numpy as np
-import joblib
-from ultralytics import YOLO
-
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import pandas as pd
+from ultralytics import YOLO
 
 
 class YoloPoseEstimation:
@@ -16,7 +11,7 @@ class YoloPoseEstimation:
         self.result = None
 
     def estimate(self, input):
-        self.result = self.model(input, stream=True)
+        self.result = self.model(input, stream=True, persist=True)
         return self.result
 
     def info(self):
@@ -47,6 +42,13 @@ def calculate_angle(a, b, c):
     return angle
 
 
+def is_coordinate_zero(c1, c2, c3):
+    if c1 == [0, 0] and c2 == [0, 0] and c3 == [0, 0]:
+        return True
+    else:
+        return False
+
+
 # Define the neural network model
 class ThreeLayerClassifier(nn.Module):
     def __init__(self, input_size, hidden_size1, output_size):
@@ -64,41 +66,111 @@ class ThreeLayerClassifier(nn.Module):
         return x
 
 
+class FightDetection:
+    def __init__(self, fight_model, fps):
+        # Architect the deep learning structure
+        self.input_size = 16
+        self.hidden_size = 8
+        self.output_size = 1
+        self.model = ThreeLayerClassifier(self.input_size, self.hidden_size, self.output_size)
+        self.model.load_state_dict(torch.load(fight_model))
+        self.model.eval()  # Set to evaluation mode
+
+        # Coordinate for angel
+        self.coordinate_for_angel = [
+            [8, 6, 2],
+            [11, 5, 7],
+            [6, 8, 10],
+            [5, 7, 9],
+            [6, 12, 14],
+            [5, 11, 13],
+            [12, 14, 16],
+            [11, 13, 15]
+        ]
+
+        # Set up the thresholds
+        self.threshold = 0.8  # Dictate how deep learning is sure there is fight on that frame
+        self.conclusion_threshold = 3  # Dictate how hard the program conclude if there is fight in the scene (1 - 3)
+        self.FPS = fps
+
+        # Event variables
+        self.is_fight_occur = False
+
+    def detect(self, conf, xyn):
+        input_list = []
+        keypoint_unseen = False
+        fight_detected = 0
+        for n in self.coordinate_for_angel:
+            # Keypoint number that we want to make new angel
+            first, mid, end = n[0], n[1], n[2]
+
+            # Gather the coordinate with keypoint number
+            c1, c2, c3 = xyn[first], xyn[mid], xyn[end]
+            # Check if all three coordinate of one key points is all zeros
+            if is_coordinate_zero(c1, c2, c2):
+                keypoint_unseen = True
+                break
+            else:
+                # Getting angel from three coordinate
+                input_list.append(calculate_angle(c1, c2, c3))
+                # Getting the confs mean of three of those coordinate
+                conf1, conf2, conf3 = conf[first], conf[mid], conf[end]
+                input_list.append(torch.mean(torch.Tensor([conf1, conf2, conf3])).item())
+
+        if keypoint_unseen:
+            return
+
+        # Make a prediction
+        prediction = self.model(torch.Tensor(input_list))
+        if prediction.item() > self.threshold:
+            # FIGHT
+            # this will grow exponentially according to number of person fighting on scene
+            # if there is two person, and this will be added 2 for each frame
+            fight_detected += 1
+        else:
+            # NO FIGHT
+            # this if statement is for fight_detected not exceed negative value
+            if fight_detected > 0:
+                fight_detected -= 3
+                # this value will decide how hard the program will conclude there is a fight in the frame
+                # the higher the value, the more hard program to conclude
+
+        # Threshold for fight_detected value, when it concludes there is fight on the frame
+        # THRESHOLD = FPS * NUMBER OF PERSON DETECTED
+        if fight_detected > self.FPS * len(conf):
+            self.is_fight_occur = True
+
+    def annotate(self, frame, box):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_color = (255, 255, 255)
+        font_thickness = 2
+
+        # Choose the position to put the text
+        text_position = (int(box[2]), int(box[3]))
+
+        TEXT = "FIGHT" if self.is_fight_occur else "?"
+
+        # Add text to the image
+        cv2.putText(frame, f"{TEXT}", text_position, font, font_scale, font_color, font_thickness)
+
+        return frame
+
+
+YOLO_MODEL = "yolo_model/yolov8n-pose_openvino_model"
+FIGHT_MODEL = "training-area/MODEL/angel/lapas_ngaseman.pth"
+FPS = 20
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("yolo_model/yolov8n-pose_openvino_model")
-    # loaded_model = joblib.load("training-area/MODEL/angel/lapas_ngaseman_logistic_regression.pkl")
-
-    # Initialize the model, loss function, and optimizer
-    input_size = 16
-    hidden_size1 = 8
-    output_size = 1
-    model = ThreeLayerClassifier(input_size, hidden_size1, output_size)
-    loaded_model = torch.load("training-area/MODEL/angel/lapas_ngaseman.pth")
-    model.load_state_dict(loaded_model)
-    model.eval()
-
-    # variable for gathering angel
-    # index keypoints number
-    need = [
-        [8, 6, 2],
-        [11, 5, 7],
-        [6, 8, 10],
-        [5, 7, 9],
-        [6, 12, 14],
-        [5, 11, 13],
-        [12, 14, 16],
-        [11, 13, 15]
-    ]
-
-    THRESHOLD = 0.7
-    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_1010_1095.mp4"):
+    fdet = FightDetection(FIGHT_MODEL, FPS)
+    yolo = YoloPoseEstimation(YOLO_MODEL)
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/NO_FIGHT_775_825.mp4"):
         # Wait for a key event and get the ASCII code
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-        res = result.plot()
+        # Get the result image from YOLOv8
+        result_frame = result.plot()
+
         try:
             boxes = result.boxes.xyxy.tolist()
             xyn = result.keypoints.xyn.tolist()
@@ -108,49 +180,16 @@ if __name__ == "__main__":
             else:
                 confs = confs.tolist()
 
-            temp_pred = []
-            # Using a for loop with zip
-            for conf_row, xyn_row, box in zip(confs, xyn, boxes):
-                two = []  # this for angel
-                # this is gathering angel data
-                for n in need:
-                    # index
-                    first = n[0]
-                    mid = n[1]
-                    end = n[2]
+            # Prediction start here
+            for conf, xyn, box in zip(confs, xyn, boxes):
+                # Fight Detection
+                fdet.detect(conf, xyn)
 
-                    # get data using the index before
-                    # getting angel from three coordinate
-                    two.append(calculate_angle(xyn_row[first], xyn_row[mid], xyn_row[end]))
-                    two.append(torch.mean(torch.Tensor([conf_row[first], conf_row[mid], conf_row[end]])).item())
+                # Plot
+                result_frame = fdet.annotate(result_frame, box)
 
-                # do prediction
-                TEXT = "?"
-                # pred = loaded_model.predict_proba(np.array(two).reshape(1, -1))
-                pred = model(torch.Tensor(two))
-                if pred.item() > THRESHOLD:
-                    temp_pred.append(1)
-                    TEXT = "FIGHT"
-                else:
-                    temp_pred.append(0)
-                    TEXT = "NO FIGHT"
-
-                # give some text
-                # annotate the frame with text - for easier data capturing
-                # Choose the font type and scale
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.5
-
-                # Choose the font color and thickness
-                font_color = (255, 255, 255)  # White color in BGR
-                font_thickness = 2
-
-                # Choose the position to put the text
-                text_position = (int(box[2]), int(box[3]))
-                # Add text to the image
-                cv2.putText(res, f"{TEXT}", text_position, font, font_scale, font_color, font_thickness)
-
-            # print(f"PREDICTION : {temp_pred}")
-            cv2.imshow("webcam", res)
+            cv2.imshow("webcam", result_frame)
         except TypeError as te:
             pass
+
+    cv2.destroyAllWindows()

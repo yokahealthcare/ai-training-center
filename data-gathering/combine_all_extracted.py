@@ -21,7 +21,7 @@ for csv_file in csv_files:
     combined_data = pd.concat([combined_data, df], ignore_index=True)
 
 # drop any zero on values
-combined_data = combined_data[combined_data.drop('class', axis=1).ne(0).all(axis=1)]
+# combined_data = combined_data[combined_data.drop('class', axis=1).ne(0).all(axis=1)]
 
 # Get the current date
 current_date = datetime.now().strftime("%d%m%Y")
