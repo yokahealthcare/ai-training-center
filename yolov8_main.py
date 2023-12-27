@@ -11,7 +11,7 @@ class YoloPoseEstimation:
         self.result = None
 
     def estimate(self, input):
-        self.result = self.model(input, stream=True)
+        self.result = self.model.track(input, stream=True, tracker="bytetrack.yaml", conf=0.4, persist=True)
         return self.result
 
     def info(self):
@@ -90,12 +90,11 @@ class FightDetection:
 
         # Set up the thresholds
         self.threshold = 0.8  # Dictate how deep learning is sure there is fight on that frame
-        self.conclusion_threshold = 2  # Dictate how hard the program conclude if there is fight in the scene (1 - 3)
+        self.conclusion_threshold = 2  # Dictate how hard the program conclude if a person is in fight action (1 - 3)
         self.FPS = fps
 
         # Event variables
         self.fight_detected = 0
-        self.is_fight_occur = False
 
     def detect(self, conf, xyn):
         input_list = []
@@ -138,68 +137,57 @@ class FightDetection:
         # Threshold for fight_detected value, when it concludes there is fight on the frame
         # THRESHOLD = FPS * NUMBER OF PERSON DETECTED
         if self.fight_detected > self.FPS:
-            self.is_fight_occur = True
-        elif self.fight_detected <= 0:
-            self.is_fight_occur = False
-
-    def annotate(self, frame, box):
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        font_color = (255, 255, 255)
-        font_thickness = 2
-
-        # Choose the position to put the text
-        text_position = (int(box[2]), int(box[3]))
-
-        TEXT = "FIGHT" if self.is_fight_occur else "?"
-
-        # Add text to the image
-        cv2.putText(frame, f"{TEXT}", text_position, font, font_scale, font_color, font_thickness)
-
-        return frame
+            return True
+        else:
+            return False
 
 
-def calculate_iou(box1, box2):
-    # Calculate intersection coordinates
-    x1_inter = max(box1[0], box2[0])
-    y1_inter = max(box1[1], box2[1])
-    x2_inter = min(box1[2], box2[2])
-    y2_inter = min(box1[3], box2[3])
+class IOU:
+    def __init__(self):
+        pass
 
-    # Calculate area of intersection
-    area_inter = max(0, x2_inter - x1_inter + 1) * max(0, y2_inter - y1_inter + 1)
+    def calculate_iou(self, box1, box2):
+        # Calculate intersection coordinates
+        x1_inter = max(box1[0], box2[0])
+        y1_inter = max(box1[1], box2[1])
+        x2_inter = min(box1[2], box2[2])
+        y2_inter = min(box1[3], box2[3])
 
-    # Calculate area of individual bounding boxes
-    area_box1 = (box1[2] - box1[0] + 1) * (box1[3] - box1[1] + 1)
-    area_box2 = (box2[2] - box2[0] + 1) * (box2[3] - box2[1] + 1)
+        # Calculate area of intersection
+        area_inter = max(0, x2_inter - x1_inter + 1) * max(0, y2_inter - y1_inter + 1)
 
-    # Calculate union area
-    area_union = area_box1 + area_box2 - area_inter
+        # Calculate area of individual bounding boxes
+        area_box1 = (box1[2] - box1[0] + 1) * (box1[3] - box1[1] + 1)
+        area_box2 = (box2[2] - box2[0] + 1) * (box2[3] - box2[1] + 1)
 
-    # Calculate IoU
-    iou = area_inter / area_union if area_union > 0 else 0.0
-    return iou
+        # Calculate union area
+        area_union = area_box1 + area_box2 - area_inter
 
+        # Calculate IoU
+        iou = area_inter / area_union if area_union > 0 else 0.0
+        return iou
 
-def calculate_all_ious(bounding_boxes):
-    num_boxes = len(bounding_boxes)
-    ious = []
+    def calculate_all_ious(self, bounding_boxes):
+        num_boxes = len(bounding_boxes)
+        ious = []
 
-    for i in range(num_boxes):
-        for j in range(i + 1, num_boxes):
-            iou = calculate_iou(bounding_boxes[i], bounding_boxes[j])
-            ious.append(iou)
+        for i in range(num_boxes):
+            for j in range(i + 1, num_boxes):
+                ious.append(self.calculate_iou(bounding_boxes[i], bounding_boxes[j]))
 
-    return ious
+        return ious
 
 
 YOLO_MODEL = "yolo_model/yolov8n-pose_openvino_model"
 FIGHT_MODEL = "training-area/MODEL/angel/lapas_ngaseman.pth"
 FPS = 20
+FIGHT_ON = False
+FIGHT_ON_TIMEOUT = 20  # second
+
 if __name__ == "__main__":
     fdet = FightDetection(FIGHT_MODEL, FPS)
     yolo = YoloPoseEstimation(YOLO_MODEL)
-    for result in yolo.estimate("dataset/video/CCTV_florida.mp4"):
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT MASJID/FIGHT_455_490.mp4"):
         # Wait for a key event and get the ASCII code
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -211,44 +199,64 @@ if __name__ == "__main__":
             boxes = result.boxes.xyxy.tolist()
             xyn = result.keypoints.xyn.tolist()
             confs = result.keypoints.conf
-            if confs is None:
-                confs = []
-            else:
-                confs = confs.tolist()
+            ids = result.boxes.id
+            dict_of_action = None
+
+            confs = [] if confs is None else confs.tolist()
+            ids = [] if ids is None else [str(int(ID)) for ID in ids]
+            dict_of_action = {ID: {'ACTION': False, 'ENEMY': None} for ID in ids}
 
             # Processing interaction box
             interaction_boxes = []
-            ious = calculate_all_ious(boxes)
+            iou = IOU()
             print("IoU between bounding boxes:")
-            for i, iou in enumerate(ious):
+            for i, iou in enumerate(iou.calculate_all_ious(boxes)):
                 print(f"Box {i + 1} and Box {i + 2}: {iou:.4f}")
-                if iou > 0.1:
+                if iou > 0.05:
                     try:
-                        interaction = [
+                        # Create interaction box coordinate
+                        interaction_coordinate = [
                             min(boxes[i][0], boxes[i + 1][0]),  # x1
                             min(boxes[i][1], boxes[i + 1][1]),  # y1
                             max(boxes[i][2], boxes[i + 1][2]),  # x2
                             max(boxes[i][3], boxes[i + 1][3])  # y2
                         ]
-                        interaction_boxes.append(interaction)
+                        interaction_boxes.append(interaction_coordinate)
                     except IndexError:
                         pass
 
-            # Prediction start here - per person
-            for conf, xyn, box in zip(confs, xyn, boxes):
-                # if len(interaction_boxes) != 0:
-                #     # Fight Detection
-                #     fdet.detect(conf, xyn)
-
-                # Plot
-                result_frame = fdet.annotate(result_frame, box)
-
             # Interaction Box
-            for box in interaction_boxes:
-                cv2.rectangle(result_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
+            for inter_box in interaction_boxes:
+                cv2.rectangle(result_frame, (int(inter_box[0]), int(inter_box[1])),
+                              (int(inter_box[2]), int(inter_box[3])), (0, 255, 0), 2)
+
+                # Prediction start here - per person - all person on the frame - including outside the interaction box
+                both_fighting = []
+                for conf, xyn, box, identity in zip(confs, xyn, boxes, ids):
+                    # Check if the person is within the interaction box - filter only person inside interaction box
+                    center_person_x, center_person_y = (box[2] + box[0]) / 2, (box[3] + box[1]) / 2
+                    if inter_box[0] <= center_person_x <= inter_box[2] and inter_box[1] <= center_person_y <= inter_box[3]:
+                        # Fight Detection
+                        is_person_fighting = fdet.detect(conf, xyn)
+                        both_fighting.append(is_person_fighting)
+
+                # Check if both fighting
+                if all(both_fighting) or FIGHT_ON:
+                    cv2.putText(result_frame, "FIGHTING", (int(inter_box[2]), int(inter_box[3])),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
+                    FIGHT_ON = True
 
             cv2.imshow("webcam", result_frame)
         except TypeError as te:
             pass
+
+        # RING THE ALARM
+        if FIGHT_ON:
+            print("RINGGGGGG")
+            FIGHT_ON_TIMEOUT -= 1 / FPS
+
+        if FIGHT_ON_TIMEOUT <= 0:
+            FIGHT_ON = False
+            FIGHT_ON_TIMEOUT = 20
 
     cv2.destroyAllWindows()
