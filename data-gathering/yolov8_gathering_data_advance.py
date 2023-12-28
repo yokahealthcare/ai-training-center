@@ -47,10 +47,10 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8x-pose.engine")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose_openvino_model")
 
     # Path to the directory that stored all frame of the video
-    directory_path = "../dataset/lapas ngaseman/CCTV FIGHT/FIGHT_595_640"
+    directory_path = "../dataset/fight/all_videos_frames"
     FILENAME = directory_path.split("/")[-1]
     # Open the text file for reading
     file_path = f'{directory_path}/annotation_time'
@@ -110,20 +110,17 @@ if __name__ == "__main__":
                 cv2.imshow("Webcam", result[0].plot())
 
                 # Waiting for user to decide which one KEYPOINTS to write
-                if target != 3:
+                if target != 300:
                     key = cv2.waitKey(0) & 0xFF  # Wait indefinitely for a key press
-                    if key == ord('a'):
-                        print("LEFT skeletal keypoints saved")
-                        target = 0
-                    elif key == ord('d'):
-                        print("RIGHT skeletal keypoints saved")
-                        target = 1
+                    if ord('0') <= key <= ord('9'):
+                        target = key - ord('0')
+                        print(f"Skeletal keypoints saved for target {target}")
                     elif key == ord('b'):
                         print("BOTH skeletal keypoints saved")
-                        target = 2
+                        target = 200
                     elif key == ord('v'):
                         print("FAST ANNOTATE skeletal keypoints saved")
-                        target = 3
+                        target = 300
                     elif key == ord('s'):
                         print("SKIPPED!")
                         continue
@@ -133,7 +130,7 @@ if __name__ == "__main__":
 
                 try:
                     # Writing key points process
-                    if target != 2 and target != 3:
+                    if target != 200 and target != 300:
                         xyn = [result[0].keypoints.xyn.tolist()[target]]
                         confs = [result[0].keypoints.conf.tolist()[target]]
                     else:
@@ -175,7 +172,7 @@ if __name__ == "__main__":
                 except:
                     pass
 
-    filename = f"lapas_ngaseman_{FILENAME}.csv"
+    filename = f"cctv_fight_0_1000_{FILENAME}.csv"
     # save the pure coordinate
     pure.to_csv(f"yolov8_extracted_advance/{filename}", index=False)
     # save the angel
