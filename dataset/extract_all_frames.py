@@ -4,9 +4,9 @@ import cv2
 from tqdm import tqdm
 
 # Get a list of all .mp4 files in the current directory
-mp4_files = [file for file in os.listdir('noFight') if file.endswith('.mp4')]
+mp4_files = ["2.mp4"]
 
-output_directory = "all_videos_frames"
+output_directory = "2"
 count = 0
 # Iterate through each .mp4 file
 for NAME in mp4_files:

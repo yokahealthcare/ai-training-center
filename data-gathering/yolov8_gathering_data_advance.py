@@ -47,10 +47,10 @@ def calculate_angle(a, b, c):
 
 
 if __name__ == "__main__":
-    yolo = YoloPoseEstimation("../yolo_model/yolov8n-pose_openvino_model")
+    yolo = YoloPoseEstimation("../yolo_model/yolov8x-pose.engine")
 
     # Path to the directory that stored all frame of the video
-    directory_path = "../dataset/fight/all_videos_frames"
+    directory_path = "../dataset/rekam sendiri/2"
     FILENAME = directory_path.split("/")[-1]
     # Open the text file for reading
     file_path = f'{directory_path}/annotation_time'
@@ -172,7 +172,7 @@ if __name__ == "__main__":
                 except:
                     pass
 
-    filename = f"cctv_fight_0_1000_{FILENAME}.csv"
+    filename = f"cctv_rekam_sendiri_{FILENAME}.csv"
     # save the pure coordinate
     pure.to_csv(f"yolov8_extracted_advance/{filename}", index=False)
     # save the angel

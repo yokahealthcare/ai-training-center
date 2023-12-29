@@ -24,6 +24,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/data-gathering/yolov8_extracted_angel_advance/cctv_rekam_sendiri_1.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/data-gathering/yolov8_extracted_angel_advance/cctv_rekam_sendiri_1000_1.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/data-gathering/yolov8_extracted_angel_advance/lapas_ngaseman_FIGHT_190_230.csv">
           <value>
             <Attribute>
