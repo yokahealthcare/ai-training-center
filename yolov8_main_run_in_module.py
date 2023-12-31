@@ -4,7 +4,7 @@ import imutils
 import fight_module
 
 YOLO_MODEL = "yolo_model/yolov8n-pose_openvino_model"
-FIGHT_MODEL = "training-area/MODEL/angel/lapas_ngaseman.pth"
+FIGHT_MODEL = "training-area/MODEL/angel/lapas_ngaseman_v2.pth"
 FPS = 20
 FIGHT_ON = False
 FIGHT_ON_TIMEOUT = 20  # second
@@ -12,7 +12,7 @@ FIGHT_ON_TIMEOUT = 20  # second
 if __name__ == "__main__":
     fdet = fight_module.FightDetector(FIGHT_MODEL, FPS)
     yolo = fight_module.YoloPoseEstimation(YOLO_MODEL)
-    for result in yolo.estimate("dataset/sholat/masjid_belakang.mp4"):
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/FIGHT_190_230.mp4"):
         # Wait for a key event and get the ASCII code
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

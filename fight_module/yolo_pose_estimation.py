@@ -7,7 +7,7 @@ class YoloPoseEstimation:
         self.result = None
 
     def estimate(self, input):
-        self.result = self.model.track(input, tracker="bytetrack.yaml", conf=0.4, persist=True)
+        self.result = self.model.track(input, stream=True, tracker="bytetrack.yaml", conf=0.4, persist=True)
         return self.result
 
     def info(self):

@@ -1,13 +1,5 @@
 import cv2
-import numpy as np
-import joblib
 from ultralytics import YOLO
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import pandas as pd
 
 
 class YoloPoseEstimation:
