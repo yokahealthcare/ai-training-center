@@ -21,7 +21,7 @@ class ThreeLayerClassifier(nn.Module):
 
 
 class FightDetector:
-    def __init__(self, fight_model, fps):
+    def __init__(self, fight_model):
         # Architect the deep learning structure
         self.input_size = 16
         self.hidden_size = 8
@@ -42,10 +42,17 @@ class FightDetector:
             [11, 13, 15]
         ]
 
+        """
+            LAYER OF CORRECT PREDICTION
+            1. MODEL_THRESHOLD          : Dictate how deep learning is sure there is fight on that frame
+            2. CONCLUSION_THRESHOLD     : Dictate how hard the program conclude if a person is in fight action (2 - 4)                            
+            3. FINAL_THRESHOLD          : Dictate how many correct fight detected is allowed for the bell to ring
+        """
+
         # Set up the thresholds
-        self.threshold = 0.8  # Dictate how deep learning is sure there is fight on that frame
-        self.conclusion_threshold = 2  # Dictate how hard the program conclude if a person is in fight action (1 - 3)
-        self.FPS = fps
+        self.model_threshold = 0.5
+        self.conclusion_threshold = 2
+        self.final_threshold = 20
 
         # Event variables
         self.fight_detected = 0
@@ -75,7 +82,7 @@ class FightDetector:
 
         # Make a prediction
         prediction = self.model(torch.Tensor(input_list))
-        if prediction.item() > self.threshold:
+        if prediction.item() > self.model_threshold:
             # FIGHT
             # this will grow exponentially according to number of person fighting on scene
             # if there is two person, and this will be added 2 for each frame
@@ -89,8 +96,7 @@ class FightDetector:
                 # the higher the value, the more hard program to conclude
 
         # Threshold for fight_detected value, when it concludes there is fight on the frame
-        # THRESHOLD = FPS * NUMBER OF PERSON DETECTED
-        if self.fight_detected > self.FPS:
+        if self.fight_detected > self.final_threshold:
             return True
         else:
             return False

@@ -12,9 +12,9 @@ FIGHT_ON = False
 FIGHT_ON_TIMEOUT = 20  # second
 
 if __name__ == "__main__":
-    fdet = fight_module.FightDetector(FIGHT_MODEL, FPS)
+    fdet = fight_module.FightDetector(FIGHT_MODEL)
     yolo = fight_module.YoloPoseEstimation(YOLO_MODEL)
-    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/FIGHT_355_390.mp4"):
+    for result in yolo.estimate("dataset/lapas ngaseman/CCTV FIGHT/FIGHT_595_640.mp4"):
         # Wait for a key event and get the ASCII code
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -52,8 +52,7 @@ if __name__ == "__main__":
                 for conf, xyn, box, identity in zip(confs, xyn, boxes, ids):
                     # Check if the person is within the interaction box - filter only person inside interaction box
                     center_person_x, center_person_y = ((box[2] + box[0]) / 2), ((box[3] + box[1]) / 2)
-                    if inter_box[0] <= center_person_x <= inter_box[2] and inter_box[1] <= center_person_y <= inter_box[
-                        3]:
+                    if inter_box[0] <= center_person_x <= inter_box[2] and inter_box[1] <= center_person_y <= inter_box[3]:
                         # Fight Detection
                         is_person_fighting = fdet.detect(conf, xyn)
                         both_fighting.append(is_person_fighting)
